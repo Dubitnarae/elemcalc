@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f2f2f7">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="칭량">
+<meta name="robots" content="noindex">
+<title>원소 함량 계산기 · 칭량</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root {
+  --bg: #f2f2f7; --card: #fff; --text: #1d1d1f; --sub: #86868b; --line: #e5e5ea;
+  --accent: #0071e3; --ok: #248a3d; --ok-bg: #e9f7ed; --warn: #c93400; --warn-bg: #fff3dc;
+  --bad: #d70015; --bad-bg: #ffe9e7; --field: #f2f2f7;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; background: var(--bg); color: var(--text); }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard",
+               "Noto Sans KR", "Malgun Gothic", sans-serif;
+  font-size: 16px; line-height: 1.4; -webkit-font-smoothing: antialiased;
+  padding: env(safe-area-inset-top) 0 calc(96px + env(safe-area-inset-bottom));
+}
+.num { font-variant-numeric: tabular-nums; }
+button { font: inherit; color: inherit; border: none; background: none; cursor: pointer; }
+.wrap { max-width: 640px; margin: 0 auto; padding: 0 16px; }
+
+/* navigation */
+.nav { position: sticky; top: 0; z-index: 5; background: rgba(242, 242, 247, .86);
+       backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); }
+.nav .wrap { display: flex; align-items: center; height: 48px; gap: 8px; }
+.nav .back { color: var(--accent); font-size: 17px; padding: 8px 4px; margin-left: -4px; }
+.nav .title { flex: 1; text-align: center; font-weight: 600; font-size: 17px;
+              overflow: hidden; white-space: nowrap; text-overflow: ellipsis; opacity: 0;
+              transition: opacity .2s; }
+.nav.scrolled .title { opacity: 1; }
+.nav .icon { color: var(--accent); font-size: 15px; padding: 8px 4px; }
+.nav .spacer { width: 52px; }
+
+h1 { font-size: 30px; line-height: 1.15; font-weight: 700; letter-spacing: -0.02em;
+     margin: 4px 0 4px; word-break: break-all; }
+.meta { color: var(--sub); font-size: 15px; }
+h2 { font-size: 20px; font-weight: 700; margin: 28px 4px 10px; letter-spacing: -0.01em; }
+.section-note { color: var(--sub); font-size: 13px; margin: -4px 4px 10px; }
+
+.card { background: var(--card); border-radius: 16px; padding: 16px; margin-bottom: 12px; }
+
+/* progress */
+.progress { margin-top: 16px; }
+.progress .bar { height: 6px; border-radius: 3px; background: #e3e3e8; overflow: hidden; }
+.progress .bar i { display: block; height: 100%; width: 0; background: var(--ok);
+                   border-radius: 3px; transition: width .3s; }
+.progress .label { display: flex; justify-content: space-between; color: var(--sub);
+                   font-size: 13px; margin-top: 6px; }
+
+.banner { border-radius: 14px; padding: 12px 14px; margin-top: 14px; font-size: 14px;
+          background: #e3eeff; color: #0b4a99; }
+.banner.warn { background: var(--warn-bg); color: var(--warn); }
+
+/* materials */
+.mat { position: relative; transition: box-shadow .2s; }
+.mat .top { display: flex; align-items: flex-start; gap: 10px; }
+.mat .name { font-size: 17px; font-weight: 600; word-break: break-all; }
+.mat .desc { color: var(--sub); font-size: 13px; margin-top: 1px; }
+.mat .badge { margin-left: auto; flex: none; width: 28px; height: 28px; border-radius: 14px;
+              border: 2px solid #d1d1d6; display: grid; place-items: center; color: #fff;
+              font-size: 15px; font-weight: 700; }
+.mat.ok .badge { background: var(--ok); border-color: var(--ok); }
+.mat.short .badge, .mat.over .badge, .mat.invalid .badge { background: var(--warn); border-color: var(--warn); }
+.mat .target { display: flex; align-items: baseline; gap: 6px; margin: 12px 0 10px; }
+.mat .target .label { color: var(--sub); font-size: 14px; width: 34px; }
+.mat .target .value { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; }
+.mat .target .unit { color: var(--sub); font-size: 17px; }
+.mat .target .was { color: var(--sub); font-size: 13px; margin-left: auto; text-decoration: line-through; }
+.field { display: flex; align-items: center; background: var(--field); border-radius: 12px;
+         padding: 0 14px; border: 2px solid transparent; transition: border-color .15s, background .15s; }
+.field:focus-within { border-color: var(--accent); background: #fff; }
+.field input { flex: 1; min-width: 0; border: none; background: none; outline: none;
+               font: inherit; font-size: 22px; font-weight: 600; padding: 11px 0;
+               color: var(--text); font-variant-numeric: tabular-nums; }
+.field input::placeholder { color: #aeaeb2; font-weight: 400; font-size: 17px; }
+.field .unit { color: var(--sub); font-size: 17px; }
+.mat .state { font-size: 14px; margin-top: 8px; min-height: 20px; color: var(--sub); }
+.mat.ok .state { color: var(--ok); }
+.mat.short .state, .mat.invalid .state { color: var(--warn); }
+.mat.over .state { color: var(--bad); }
+.mat.ok { box-shadow: inset 0 0 0 2px var(--ok-bg); }
+
+/* composition */
+.seg { display: inline-flex; background: #e3e3e8; border-radius: 9px; padding: 2px; float: right;
+       margin-top: -2px; }
+.seg button { padding: 4px 12px; border-radius: 7px; font-size: 13px; color: #3a3a3c; }
+.seg button.on { background: #fff; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+th { color: var(--sub); font-weight: 600; font-size: 12px; text-align: right; padding: 0 0 8px; }
+th:first-child, td:first-child { text-align: left; }
+td { padding: 9px 0; border-top: 1px solid var(--line); text-align: right; }
+td:first-child { font-weight: 600; }
+td.off { color: var(--warn); font-weight: 600; }
+td.good { color: var(--ok); }
+
+textarea { width: 100%; min-height: 84px; resize: vertical; border: 2px solid transparent;
+           border-radius: 12px; background: var(--field); padding: 12px 14px; font: inherit;
+           font-size: 16px; color: var(--text); outline: none; }
+textarea:focus { border-color: var(--accent); background: #fff; }
+
+/* bottom bar */
+.bottom { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+          padding: 10px 0 calc(10px + env(safe-area-inset-bottom));
+          background: rgba(242, 242, 247, .9); backdrop-filter: saturate(180%) blur(20px);
+          -webkit-backdrop-filter: saturate(180%) blur(20px); border-top: 1px solid rgba(0,0,0,.06); }
+.btn { display: block; width: 100%; padding: 15px; border-radius: 14px; font-size: 17px;
+       font-weight: 600; background: var(--accent); color: #fff; text-align: center; }
+.btn:active { opacity: .85; }
+.btn.plain { background: var(--card); color: var(--accent); }
+.btn.danger { background: var(--card); color: var(--bad); }
+
+/* home */
+.list .item { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; }
+.list .item .grow { flex: 1; min-width: 0; }
+.list .item .name { font-weight: 600; font-size: 17px; white-space: nowrap; overflow: hidden;
+                    text-overflow: ellipsis; }
+.list .item .sub { color: var(--sub); font-size: 13px; }
+.list .item .chev { color: #c7c7cc; font-size: 22px; }
+.pill { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 10px;
+        background: #e3e3e8; color: #3a3a3c; white-space: nowrap; }
+.pill.done { background: var(--ok-bg); color: var(--ok); }
+.steps { margin: 0; padding-left: 20px; color: #3a3a3c; }
+.steps li { margin: 6px 0; }
+.empty { text-align: center; color: var(--sub); padding: 28px 12px; }
+.empty .big { font-size: 44px; margin-bottom: 8px; }
+
+/* sheet */
+.sheet-bg { position: fixed; inset: 0; background: rgba(0,0,0,.3); z-index: 10; display: none; }
+.sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 11; background: var(--bg);
+         border-radius: 16px 16px 0 0; padding: 8px 0 calc(20px + env(safe-area-inset-bottom));
+         transform: translateY(105%); transition: transform .25s ease; max-height: 90vh; overflow: auto; }
+.sheet.open { transform: none; }
+.sheet .grab { width: 36px; height: 5px; border-radius: 3px; background: #c7c7cc; margin: 0 auto 10px; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+       padding: 12px 0; border-top: 1px solid var(--line); }
+.row:first-child { border-top: none; padding-top: 0; }
+.row .hint { color: var(--sub); font-size: 13px; }
+.row input[type=text] { width: 110px; text-align: right; border: none; background: var(--field);
+                        border-radius: 10px; padding: 8px 10px; font: inherit; font-size: 16px; }
+.switch { position: relative; width: 51px; height: 31px; flex: none; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch i { position: absolute; inset: 0; background: #e3e3e8; border-radius: 16px; transition: background .2s; }
+.switch i::after { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px;
+                   border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,.2);
+                   transition: transform .2s; }
+.switch input:checked + i { background: #34c759; }
+.switch input:checked + i::after { transform: translateX(20px); }
+
+.toast { position: fixed; left: 50%; bottom: calc(100px + env(safe-area-inset-bottom)); z-index: 20;
+         transform: translate(-50%, 20px); opacity: 0; background: rgba(29,29,31,.92); color: #fff;
+         padding: 10px 16px; border-radius: 20px; font-size: 14px; transition: all .25s;
+         pointer-events: none; max-width: 90vw; text-align: center; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header class="nav" id="nav">
+  <div class="wrap">
+    <button class="back" id="back" hidden>‹ 목록</button>
+    <span class="spacer" id="backSpacer"></span>
+    <div class="title" id="navTitle"></div>
+    <button class="icon" id="settingsBtn" aria-label="설정">설정</button>
+  </div>
+</header>
+<main class="wrap" id="main"></main>
+<div class="bottom" id="bottom" hidden><div class="wrap">
+  <button class="btn" id="shareBtn">결과 보내기</button>
+</div></div>
+
+<div class="sheet-bg" id="sheetBg"></div>
+<div class="sheet" id="sheet"><div class="wrap">
+  <div class="grab"></div>
+  <h2 style="margin-top:4px">설정</h2>
+  <div class="card">
+    <div class="row"><div>칭량 허용 오차<div class="hint">이 안이면 ✓ 완료로 봅니다</div></div>
+      <label class="field" style="padding:0 10px"><input type="text" id="tolG" inputmode="decimal"
+        style="width:90px;font-size:17px;text-align:right;padding:8px 0"><span class="unit">&nbsp;g</span></label></div>
+    <div class="row"><div>조성 허용 오차<div class="hint">실제 조성 표에서 벗어나면 주황색</div></div>
+      <label class="field" style="padding:0 10px"><input type="text" id="tolW" inputmode="decimal"
+        style="width:90px;font-size:17px;text-align:right;padding:8px 0"><span class="unit">&nbsp;wt%</span></label></div>
+    <div class="row"><div>넘치면 나머지 원료 늘리기<div class="hint">한 원료를 많이 넣었을 때 다른 원료의 목표를
+      같은 비율로 올려 조성을 맞춥니다</div></div>
+      <label class="switch"><input type="checkbox" id="scale"><i></i></label></div>
+    <div class="row"><div>칭량 중 화면 켜 두기</div>
+      <label class="switch"><input type="checkbox" id="awake"><i></i></label></div>
+  </div>
+  <div id="planActions">
+    <button class="btn danger" id="clearBtn" style="margin-bottom:10px">입력한 칭량값 모두 지우기</button>
+    <button class="btn danger" id="deleteBtn" style="margin-bottom:10px">이 칭량 목록에서 삭제</button>
+  </div>
+  <button class="btn plain" id="closeSheet">닫기</button>
+  <p class="section-note" style="text-align:center;margin-top:16px">칭량 정보는 이 휴대폰 안에만 저장됩니다.</p>
+</div></div>
+<div class="toast" id="toast"></div>
+
+<script src="core.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

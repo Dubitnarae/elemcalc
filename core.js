@@ -4,6 +4,7 @@
   "use strict";
 
   var IMPURITY = "불순물";
+  var UNITS = { mg: 0.001, g: 1, kg: 1000 };   // grams per unit (composition.UNITS)
   var NUMBER = /^[+-]?(\d+([.,]\d*)?|[.,]\d+)([eE][+-]?\d+)?$/;
 
   /** Number typed by the user, null when empty, NaN when not a number. */
@@ -45,13 +46,27 @@
     return items.map(function (kv) { return kv[0] + " " + num3(kv[1]); }).join(" · ") + " wt%";
   }
 
+  /** Error with a code the screen turns into advice: broken (cut-off link), newer (made by
+      a newer PC version than this page), format (not a weighing plan). */
+  function planError(code, message) {
+    var e = new Error(message);
+    e.code = code;
+    return e;
+  }
+
   /** Link format from mobile.plan -> the form used here:
-      e:[[sym, wt, at]], m:[[name, describe, grams, parts]] with the impurity key restored. */
+      e:[[sym, wt, at]], m:[[name, describe, amount, parts]] with the impurity key restored;
+      u: mass unit (g when missing), q: decimals to show (4 when missing). */
   function normalise(raw) {
+    if (raw && typeof raw.v === "number" && raw.v > 1) {
+      throw planError("newer", "PC 계산기가 이 화면보다 새 버전입니다.");
+    }
     if (!raw || raw.v !== 1 || !Array.isArray(raw.m) || !Array.isArray(raw.e) || !raw.a) {
-      throw new Error("칭량 정보 형식이 올바르지 않습니다.");
+      throw planError("format", "칭량 정보 형식이 올바르지 않습니다.");
     }
     var plan = Object.assign({}, raw);
+    plan.u = UNITS[raw.u] ? raw.u : "g";
+    plan.q = typeof raw.q === "number" && raw.q >= 0 && raw.q <= 9 ? Math.round(raw.q) : 4;
     plan.m = raw.m.map(function (m) {
       var parts = {};
       Object.keys(m[2]).forEach(function (s) { parts[s === "_" ? IMPURITY : s] = m[2][s]; });
@@ -65,7 +80,18 @@
   }
 
   function decodePlan(text) {
-    return normalise(b64decode(text));
+    var raw;
+    try {
+      raw = b64decode(text);
+    } catch (e) {
+      throw planError("broken", "링크가 중간에 잘렸습니다.");
+    }
+    return normalise(raw);
+  }
+
+  /** Tolerance typed in grams, in the plan's unit. */
+  function toUnit(grams, plan) {
+    return grams / UNITS[(plan && plan.u) || "g"];
   }
 
   function recovery(plan, symbol) {
@@ -150,8 +176,9 @@
     return (x < 0 && v !== 0 ? "-" : "") + v.toFixed(decimals);
   }
 
-  var api = { IMPURITY: IMPURITY, parseNumber: parseNumber, decodePlan: decodePlan, normalise: normalise,
-              b64encode: b64encode, b64decode: b64decode, compute: compute, fmt: fmt };
+  var api = { IMPURITY: IMPURITY, UNITS: UNITS, parseNumber: parseNumber, decodePlan: decodePlan,
+              normalise: normalise, b64encode: b64encode, b64decode: b64decode, compute: compute,
+              fmt: fmt, toUnit: toUnit };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Core = api;
 })(this);

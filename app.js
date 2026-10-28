@@ -11,6 +11,7 @@
   var main = $("main");
   var current = null;      // plan entry on screen
   var wakeLock = null;
+  var storageWarned = false;
 
   // ----- storage -----
 
@@ -20,8 +21,18 @@
   var plans = load(KEY_PLANS, []);
   var settings = Object.assign({}, DEFAULTS, load(KEY_SETTINGS, {}));
 
-  function savePlans() { localStorage.setItem(KEY_PLANS, JSON.stringify(plans)); }
-  function saveSettings() { localStorage.setItem(KEY_SETTINGS, JSON.stringify(settings)); }
+  function store(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch (e) {   // private browsing, storage full, or storage switched off
+      if (!storageWarned) {
+        storageWarned = true;
+        toast("이 휴대폰에 저장하지 못했습니다. 비공개(시크릿) 모드라면 일반 창에서 열어 주세요.", 6000);
+      }
+    }
+  }
+  function savePlans() { store(KEY_PLANS, plans); }
+  function saveSettings() { store(KEY_SETTINGS, settings); }
 
   function idOf(text) {   // same link -> same entry, so values typed earlier are kept
     var h = 5381;
@@ -42,9 +53,12 @@
     });
   }
 
-  function g4(x) { return C.fmt(x, 4); }
+  function unitOf(plan) { return plan.u || "g"; }
 
-  function signed(x, d) { return (x > 0 ? "+" : "") + C.fmt(x, d); }
+  /** A mass in the plan's unit, to the decimals the PC uses (balance resolution). */
+  function m(x, plan) { return C.fmt(x, plan.q == null ? 4 : plan.q); }
+
+  function signed(text) { return (text.charAt(0) !== "-" && parseFloat(text) !== 0 ? "+" : "") + text; }
 
   function now() {
     var d = new Date(), p = function (n) { return (n < 10 ? "0" : "") + n; };
@@ -53,19 +67,29 @@
   }
 
   var toastTimer;
-  function toast(text) {
+  function toast(text, ms) {
     var t = $("toast");
     t.textContent = text;
     t.classList.add("show");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2600);
+    toastTimer = setTimeout(function () { t.classList.remove("show"); }, ms || 2600);
   }
 
   function compute(entry) {
-    return C.compute(entry.plan, entry.actual, { scale: settings.scale, tolerance: settings.tolG });
+    return C.compute(entry.plan, entry.actual,
+                     { scale: settings.scale, tolerance: C.toUnit(settings.tolG, entry.plan) });
   }
 
   // ----- routing -----
+
+  var LINK_HELP = {
+    broken: "링크가 중간에 잘려 칭량 정보를 읽지 못했습니다. QR 코드를 다시 찍거나, 카톡으로 받았다면 " +
+            "링크 전체가 한 덩어리로 왔는지 확인해 주세요. (PC에서 '링크 복사'로 다시 보내면 됩니다.)",
+    newer: "PC 계산기가 이 화면보다 새 버전입니다. 인터넷이 연결된 상태에서 이 페이지를 닫았다가 " +
+           "다시 열면 새 버전으로 바뀝니다. 그래도 안 되면 브라우저에서 새로고침해 주세요.",
+    format: "칭량 정보 형식이 올바르지 않습니다. PC 계산기의 '휴대폰으로 보내기'에서 만든 QR 코드나 " +
+            "링크인지 확인해 주세요."
+  };
 
   function route() {
     var hash = location.hash.slice(1);
@@ -77,7 +101,8 @@
         try {
           entry = { id: id, plan: C.decodePlan(text), actual: {}, memo: "", updated: Date.now() };
         } catch (e) {
-          showHome("칭량 정보를 읽지 못했습니다. QR 코드를 다시 찍어 주세요.");
+          history.replaceState(null, "", location.pathname);
+          showHome(LINK_HELP[e.code] || LINK_HELP.format);
           return;
         }
         plans.unshift(entry);
@@ -88,7 +113,8 @@
     } else if (hash.indexOf("id=") === 0 && findPlan(hash.slice(3))) {
       showPlan(findPlan(hash.slice(3)));
     } else {
-      showHome();
+      showHome(hash.indexOf("id=") === 0 ?
+        "이 칭량은 목록에 없습니다(삭제했거나 다른 휴대폰·브라우저에서 받은 것). QR 코드를 다시 찍어 주세요." : "");
     }
   }
 
@@ -111,7 +137,7 @@
         var r = compute(p), n = r.rows.length;
         html += '<button class="card item" data-id="' + p.id + '"><div class="grow">' +
           '<div class="name">' + esc(p.plan.n) + "</div>" +
-          '<div class="sub num">' + esc(p.plan.d) + " · " + esc(g4(r.total)) + " g" +
+          '<div class="sub num">' + esc(p.plan.d) + " · " + esc(m(r.total, p.plan)) + " " + esc(unitOf(p.plan)) +
           (p.memo ? " · " + esc(p.memo.split("\n")[0]) : "") + "</div></div>" +
           '<span class="pill' + (r.done === n ? " done" : "") + '">' +
           (r.done === n ? "완료" : r.done + " / " + n) + "</span>" +
@@ -138,7 +164,7 @@
 
   function showPlan(entry) {
     current = entry;
-    var plan = entry.plan;
+    var plan = entry.plan, unit = esc(unitOf(plan));
     document.title = plan.n + " · 칭량";
     $("back").hidden = false;
     $("backSpacer").hidden = true;
@@ -147,22 +173,22 @@
     $("navTitle").textContent = plan.n;
 
     var html = "<h1>" + esc(plan.n) + "</h1>" +
-      '<div class="meta num">' + esc(plan.d) + " 계산 · 총 " + esc(plan.t) + " g</div>" +
+      '<div class="meta num">' + esc(plan.d) + " 계산 · 총 " + esc(plan.t) + " " + unit + "</div>" +
       '<div class="progress"><div class="bar"><i id="bar"></i></div>' +
       '<div class="label"><span id="doneText"></span><span id="totalText" class="num"></span></div></div>' +
       '<div id="banner"></div>' +
       "<h2>원료</h2>";
-    plan.m.forEach(function (m, i) {
+    plan.m.forEach(function (mat, i) {
       html += '<div class="card mat" id="mat' + i + '"><div class="top"><div>' +
-        '<div class="name">' + esc(m[0]) + "</div>" +
-        '<div class="desc">' + esc(m[1]) + "</div></div>" +
+        '<div class="name">' + esc(mat[0]) + "</div>" +
+        '<div class="desc">' + esc(mat[1]) + "</div></div>" +
         '<div class="badge" id="badge' + i + '"></div></div>' +
         '<div class="target num"><span class="label">목표</span>' +
-        '<span class="value" id="target' + i + '"></span><span class="unit">g</span>' +
+        '<span class="value" id="target' + i + '"></span><span class="unit">' + unit + '</span>' +
         '<span class="was" id="was' + i + '"></span></div>' +
         '<label class="field"><input id="in' + i + '" type="text" inputmode="decimal" ' +
         'enterkeyhint="next" autocomplete="off" placeholder="저울 값 입력">' +
-        '<span class="unit">g</span></label>' +
+        '<span class="unit">' + unit + '</span></label>' +
         '<div class="state" id="state' + i + '"></div></div>';
     });
     html += '<h2>실제 조성 <span class="seg"><button data-b="wt">wt%</button>' +
@@ -174,12 +200,12 @@
       '<textarea id="memo" placeholder="시료 번호, 도가니, 특이사항 등"></textarea>';
     main.innerHTML = html;
 
-    plan.m.forEach(function (m, i) {
+    plan.m.forEach(function (mat, i) {
       var input = $("in" + i);
-      input.value = entry.actual[m[0]] || "";
+      input.value = entry.actual[mat[0]] || "";
       input.oninput = function () {
-        if (input.value.trim()) entry.actual[m[0]] = input.value.trim();
-        else delete entry.actual[m[0]];
+        if (input.value.trim()) entry.actual[mat[0]] = input.value.trim();
+        else delete entry.actual[mat[0]];
         touch();
         update();
       };
@@ -208,9 +234,10 @@
 
   function update() {
     var entry = current, plan = entry.plan, r = compute(entry), n = r.rows.length;
+    var unit = unitOf(plan);
     $("bar").style.width = (r.done / n * 100) + "%";
     $("doneText").textContent = r.done === n ? "모두 칭량했습니다 ✓" : r.done + " / " + n + " 칭량 완료";
-    $("totalText").textContent = "장입 " + g4(r.total) + " g";
+    $("totalText").textContent = "장입 " + m(r.total, plan) + " " + unit;
 
     var banner = "";
     if (r.k > 1 + 1e-9) {
@@ -227,14 +254,14 @@
     r.rows.forEach(function (row, i) {
       $("mat" + i).className = "card mat " + row.status;
       $("badge" + i).textContent = row.status === "ok" ? "✓" : (row.status === "todo" ? "" : "!");
-      $("target" + i).textContent = g4(row.target);
-      $("was" + i).textContent = Math.abs(row.target - row.plan) > 5e-5 ? g4(row.plan) + " g" : "";
+      $("target" + i).textContent = m(row.target, plan);
+      $("was" + i).textContent = m(row.target, plan) !== m(row.plan, plan) ? m(row.plan, plan) + " " + unit : "";
       var text = "";
       if (row.status === "todo") text = "";
-      else if (row.status === "invalid") text = "숫자가 아닙니다.";
-      else if (row.status === "ok") text = "✓ 완료 · 차이 " + signed(row.diff, 4) + " g";
-      else if (row.status === "short") text = g4(-row.diff) + " g 더 넣으세요.";
-      else text = g4(row.diff) + " g 넘었습니다." +
+      else if (row.status === "invalid") text = "숫자만 입력하세요 (예: 12.345). 쉼표(,)도 소수점으로 읽습니다.";
+      else if (row.status === "ok") text = "✓ 완료 · 차이 " + signed(m(row.diff, plan)) + " " + unit;
+      else if (row.status === "short") text = m(-row.diff, plan) + " " + unit + " 더 넣으세요.";
+      else text = m(row.diff, plan) + " " + unit + " 넘었습니다." +
         (settings.scale ? "" : " (설정에서 '넘치면 나머지 원료 늘리기'를 켜면 맞출 수 있어요)");
       $("state" + i).textContent = text;
     });
@@ -256,7 +283,7 @@
         var v = got[s] || 0, d = v - w;
         var off = Math.abs(d) > settings.tolW;
         cells += '<td class="' + (off ? "off" : "") + '">' + C.fmt(v, 2) + "</td>" +
-          '<td class="' + (off ? "off" : "good") + '">' + signed(d, 2) + "</td>";
+          '<td class="' + (off ? "off" : "good") + '">' + signed(C.fmt(d, 2)) + "</td>";
       } else {
         cells += "<td>–</td><td></td>";
       }
@@ -268,56 +295,99 @@
         "입력한 칭량값으로 계산한 조성입니다" + (plan.r && Object.keys(plan.r).length ? " (회수율 반영)." : "."));
   }
 
-  // ----- sharing the result back to the PC -----
+  // ----- sending the result back to the PC -----
 
   function resultText(entry) {
-    var plan = entry.plan, r = compute(entry);
+    var plan = entry.plan, r = compute(entry), unit = unitOf(plan);
     var lines = ["[칭량 결과] " + plan.n, now() + " 칭량 (" + plan.d + " 계산)"];
     if (entry.memo.trim()) lines.push("메모: " + entry.memo.trim());
     lines.push("");
     r.rows.forEach(function (row) {
-      lines.push(row.name + ": " + (row.typed ? g4(row.value) : "-") + " g (목표 " + g4(row.target) + ")");
+      lines.push(row.name + ": " + (row.typed ? m(row.value, plan) : "-") + " " + unit +
+                 " (목표 " + m(row.target, plan) + ")");
     });
-    if (r.k > 1 + 1e-9) lines.push("배율 ×" + C.fmt(r.k, 4) + " · 총 " + g4(r.total) + " g");
+    if (r.k > 1 + 1e-9) lines.push("배율 ×" + C.fmt(r.k, 4) + " · 총 " + m(r.total, plan) + " " + unit);
     if (r.wt) {
       lines.push("");
       lines.push((r.partial ? "예상" : "실제") + " 조성 wt%: " + (r.order || []).map(function (s) {
         return s + " " + C.fmt(r.wt[s], 2);
       }).join(" · "));
     }
-    var data = { v: 1, n: plan.n, d: plan.d, k: r.k, memo: entry.memo.trim(), at: now(), a: {} };
+    var data = { v: 1, n: plan.n, d: plan.d, k: r.k, u: unit, memo: entry.memo.trim(), at: now(), a: {} };
     r.rows.forEach(function (row) { if (row.typed) data.a[row.name] = String(entry.actual[row.name]); });
     lines.push("", "※ 아래 줄은 계산기의 '휴대폰 칭량 결과 넣기'에 쓰입니다.", "ELEMCALC1:" + C.b64encode(data));
     return lines.join("\n");
   }
 
+  /** Copy to the clipboard; resolves true/false instead of failing. */
   function copyText(text) {
-    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text);
-    var ta = document.createElement("textarea");
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand("copy");
-    ta.remove();
-    return Promise.resolve();
+    var legacy = function () {
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, text.length);
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+      ta.remove();
+      return ok;
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text).then(function () { return true; },
+                                                      function () { return legacy(); });
+    }
+    return Promise.resolve(legacy());
   }
 
-  $("shareBtn").onclick = function () {
-    if (!current) return;
+  /** Ready to send? Asks when some materials are not done yet. */
+  function readyText() {
+    if (!current) return null;
     var r = compute(current), left = r.rows.length - r.done;
-    if (!Object.keys(current.actual).length) { toast("먼저 칭량값을 입력하세요."); return; }
-    if (left > 0 && !confirm("아직 완료되지 않은 원료가 " + left + "개 있습니다. 그래도 보낼까요?")) return;
-    var text = resultText(current);
-    if (navigator.share) {
-      navigator.share({ title: "[칭량 결과] " + current.plan.n, text: text }).catch(function (e) {
-        if (e && e.name === "AbortError") return;
-        copyText(text).then(function () { toast("결과를 복사했습니다. 카톡에 붙여 넣으세요."); });
-      });
-    } else {
-      copyText(text).then(function () { toast("결과를 복사했습니다. 카톡에 붙여 넣으세요."); },
-                          function () { toast("복사하지 못했습니다."); });
-    }
+    if (!Object.keys(current.actual).length) { toast("먼저 칭량값을 입력하세요."); return null; }
+    if (left > 0 && !confirm("아직 완료되지 않은 원료가 " + left + "개 있습니다. 그래도 보낼까요?")) return null;
+    return resultText(current);
+  }
+
+  /** When copying is not allowed: show the text so it can be selected and copied by hand. */
+  function showManualCopy(text) {
+    $("manualText").value = text;
+    $("copyBg").style.display = "block";
+    $("copySheet").hidden = false;
+    setTimeout(function () { $("manualText").focus(); $("manualText").select(); }, 50);
+  }
+
+  function hideManualCopy() {
+    $("copySheet").hidden = true;
+    $("copyBg").style.display = "none";
+  }
+
+  function copyResult(text) {
+    copyText(text).then(function (ok) {
+      if (ok) toast("결과를 복사했습니다. 카톡 '나와의 채팅'에 붙여 넣으세요.", 3600);
+      else showManualCopy(text);
+    });
+  }
+
+  $("copyBtn").onclick = function () {
+    var text = readyText();
+    if (text) copyResult(text);
   };
+
+  $("shareBtn").onclick = function () {
+    var text = readyText();
+    if (!text) return;
+    if (!navigator.share) { copyResult(text); return; }
+    navigator.share({ title: "[칭량 결과] " + current.plan.n, text: text }).catch(function (e) {
+      if (e && e.name === "AbortError") return;   // closed the share sheet
+      copyResult(text);
+    });
+  };
+
+  $("closeCopy").onclick = hideManualCopy;
+  $("copyBg").onclick = hideManualCopy;
 
   // ----- settings sheet -----
 
@@ -326,6 +396,7 @@
     $("tolW").value = settings.tolW;
     $("scale").checked = settings.scale;
     $("awake").checked = settings.awake;
+    showOfflineStatus();
     $("sheetBg").style.display = "block";
     requestAnimationFrame(function () { $("sheet").classList.add("open"); });
   }
@@ -333,7 +404,9 @@
   function closeSheet() {
     var g = C.parseNumber($("tolG").value), w = C.parseNumber($("tolW").value);
     if (g !== null && !isNaN(g) && g >= 0) settings.tolG = g;
+    else if ($("tolG").value.trim()) toast("칭량 허용 오차가 숫자가 아니어서 바꾸지 않았습니다.");
     if (w !== null && !isNaN(w) && w >= 0) settings.tolW = w;
+    else if ($("tolW").value.trim()) toast("조성 허용 오차가 숫자가 아니어서 바꾸지 않았습니다.");
     settings.scale = $("scale").checked;
     settings.awake = $("awake").checked;
     saveSettings();
@@ -362,6 +435,31 @@
     closeSheet();
     location.hash = "";
   };
+
+  // ----- offline -----
+
+  function showNetwork() {
+    $("offline").hidden = navigator.onLine !== false;
+  }
+
+  /** Settings sheet line: can this page open without internet? (service worker + cache) */
+  function showOfflineStatus() {
+    var el = $("offlineStatus");
+    if (!("serviceWorker" in navigator) || !window.caches) {
+      el.textContent = "이 브라우저는 오프라인 사용을 지원하지 않습니다. 인터넷이 될 때 열어 주세요.";
+      return;
+    }
+    caches.keys().then(function (keys) {
+      var ready = navigator.serviceWorker.controller &&
+        keys.some(function (k) { return k.indexOf("elemcalc-") === 0; });
+      el.textContent = ready ? "✓ 인터넷이 끊겨도 이 화면을 열고 칭량할 수 있습니다." :
+        "오프라인 사용 준비 중입니다. 인터넷이 될 때 한 번 더 열어 두면 됩니다.";
+    }).catch(function () { el.textContent = ""; });
+  }
+
+  window.addEventListener("online", function () { showNetwork(); toast("인터넷에 다시 연결됐습니다."); });
+  window.addEventListener("offline", showNetwork);
+  showNetwork();
 
   // ----- keep the screen on while weighing -----
 

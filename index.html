@@ -117,6 +117,15 @@ textarea:focus { border-color: var(--accent); background: #fff; }
        font-weight: 600; background: var(--accent); color: #fff; text-align: center; }
 .btn:active { opacity: .85; }
 .btn.plain { background: var(--card); color: var(--accent); }
+.btns { display: flex; gap: 10px; }
+.btns .btn { width: auto; flex: 1; }
+.btns .btn.plain { flex: 0 0 32%; }
+.offline { position: sticky; top: 48px; z-index: 4; margin: 0 auto; max-width: 640px; padding: 0 16px; }
+.offline div { background: #3a3a3c; color: #fff; border-radius: 12px; padding: 8px 12px; font-size: 13px;
+               text-align: center; }
+.copy-sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 12; background: var(--bg);
+              border-radius: 16px 16px 0 0; padding: 12px 0 calc(16px + env(safe-area-inset-bottom)); }
+.copy-sheet textarea { min-height: 180px; font-size: 13px; background: var(--card); }
 .btn.danger { background: var(--card); color: var(--bad); }
 
 /* home */
@@ -173,9 +182,21 @@ textarea:focus { border-color: var(--accent); background: #fff; }
     <button class="icon" id="settingsBtn" aria-label="설정">설정</button>
   </div>
 </header>
+<div class="offline" id="offline" hidden><div>오프라인 상태입니다. 입력한 값은 이 휴대폰에 저장되고,
+  결과는 인터넷이 연결되면 보낼 수 있습니다.</div></div>
 <main class="wrap" id="main"></main>
-<div class="bottom" id="bottom" hidden><div class="wrap">
+<div class="bottom" id="bottom" hidden><div class="wrap btns">
+  <button class="btn plain" id="copyBtn">복사</button>
   <button class="btn" id="shareBtn">결과 보내기</button>
+</div></div>
+
+<div class="sheet-bg" id="copyBg"></div>
+<div class="copy-sheet" id="copySheet" hidden><div class="wrap">
+  <h2 style="margin-top:4px">직접 복사하기</h2>
+  <p class="section-note">이 브라우저가 자동 복사를 막았습니다. 아래 글을 길게 눌러 <b>전체 선택 → 복사</b>한 뒤
+    카톡에 붙여 넣으세요. 마지막 줄(ELEMCALC1:…)까지 모두 있어야 PC에서 읽을 수 있습니다.</p>
+  <textarea id="manualText" readonly></textarea>
+  <button class="btn plain" id="closeCopy" style="margin-top:10px">닫기</button>
 </div></div>
 
 <div class="sheet-bg" id="sheetBg"></div>
@@ -201,6 +222,7 @@ textarea:focus { border-color: var(--accent); background: #fff; }
   </div>
   <button class="btn plain" id="closeSheet">닫기</button>
   <p class="section-note" style="text-align:center;margin-top:16px">칭량 정보는 이 휴대폰 안에만 저장됩니다.</p>
+  <p class="section-note" style="text-align:center" id="offlineStatus"></p>
 </div></div>
 <div class="toast" id="toast"></div>
 

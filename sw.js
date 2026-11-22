@@ -1,7 +1,8 @@
 /* Offline support: serve the app files from the cache, refresh them in the background.
    Bump VERSION when the files change so phones pick up the new ones. */
-var VERSION = "elemcalc-2";
-var FILES = ["./", "index.html", "core.js", "app.js", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
+var VERSION = "elemcalc-3";
+var FILES = ["./", "index.html", "core.js", "app.js", "manifest.webmanifest", "icon-192.png", "icon-512.png",
+             "fonts/PretendardVariable.woff2"];
 
 self.addEventListener("install", function (e) {
   // cache: "reload" skips the browser's HTTP cache, so a new version never stores old files.

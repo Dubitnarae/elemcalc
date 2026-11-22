@@ -1,4 +1,4 @@
-# 원소 함량 계산기 2.19
+# 원소 함량 계산기 3.0
 
 합금 조성 계산과 칭량을 위한 프로그램입니다. 만든 사람: KIM YEONGDO
 
@@ -10,14 +10,14 @@
 ## 설치와 실행
 
 **설치해서 쓰기 (권장)**
-1. `배포\elemcalc_v2.19_setup.zip`을 원하는 곳에 풉니다. 다른 PC에 줄 때도 이 zip 하나면 됩니다.
+1. `배포\elemcalc_v3.0_setup.zip`을 원하는 곳에 풉니다. 다른 PC에 줄 때도 이 zip 하나면 됩니다.
 2. 압축을 푼 폴더에서 `설치.cmd`를 더블클릭합니다. 관리자 권한은 필요 없습니다.
 3. 바탕화면이나 시작 메뉴의 **원소 함량 계산기**로 실행합니다. `.alloy` 파일을 더블클릭해도 열립니다.
 4. 제거: Windows 설정 → 앱 → 설치된 앱 → 원소 함량 계산기 → 제거
 5. **자동 업데이트**: 새 버전이 나오면 켤 때(하루 한 번) 알림이 뜹니다. **지금 업데이트**를 누르면 새 버전을
    받아 설치하고 계산기를 다시 켭니다(저장하지 않은 내용이 있으면 먼저 묻습니다. 설정·내 모합금은 유지).
    직접 확인은 **도움말 → 업데이트 확인**, 알림을 끄려면 **도움말 → 시작할 때 새 버전 확인**을 해제합니다.
-   설치 없이 쓰는 휴대용 exe는 자동 업데이트가 되지 않고 **내려받기 페이지**로 안내합니다.
+   설치하지 않고 실행한 경우에는 자동 업데이트 대신 **내려받기 페이지**로 안내합니다.
    업데이트에 실패하면 이전 버전이 다시 열립니다.
    - 알림 창에는 GitHub 릴리스 **설명**에 적어 둔 이번 버전의 변경 사항이 그대로 보입니다.
    - 설치 직전에 설정(내 모합금, 원소별 순도·회수율·단가, 최근 파일)을
@@ -28,7 +28,9 @@
    예상하지 못한 오류가 나면 알림 창에서 바로 만들 수도 있습니다. 기록은
    `%LOCALAPPDATA%\Du_App\ElementCalc\logs`에 쌓입니다(최대 약 800KB, 오래된 것부터 지워짐).
 
-**설치 없이 쓰기:** `원소함량계산기_v2.exe`를 바로 실행합니다. 켜질 때 몇 초 더 걸립니다.
+**실행 환경:** Windows 10/11. 화면은 Windows에 들어 있는 Microsoft Edge WebView2 런타임으로 그립니다.
+없다는 안내가 나오면 안내에 따라 설치한 뒤 다시 켜세요.
+2.x(파이썬판)에서 자동 업데이트로 넘어와도 설정·내 모합금·파일은 그대로 이어집니다.
 
 > 다른 PC에서 처음 실행하면 Windows가 "PC 보호" 화면을 띄울 수 있습니다.
 > **추가 정보 → 실행**을 누르세요. 코드 서명 인증서가 없는 프로그램이라 나오는 안내입니다.
@@ -113,43 +115,42 @@
 
 ## 개발자용
 
+v3.0부터 C#(Windows 내장 .NET Framework 컴파일러, WinForms 창) + WebView2 화면입니다. 화면과 계산은 모두
+`desktop\web\`의 JavaScript가 하고, C#은 창·파일·설정(레지스트리 `HKCU\Software\Du_App\ElementCalc`)·업데이트를 맡습니다.
+
 | 파일 | 내용 |
 |---|---|
-| `app.py` | 메인 창 (주기율표, 조성 표, 되돌리기, 도구 연결) |
-| `window_materials.py` | 메인 창: 칭량 원료 표, 모합금, 원소별 기본값 |
-| `window_files.py` | 메인 창: 새로 만들기·열기·저장, 최근 파일, 자동 복구, 내보내기 |
-| `window_help.py` | 메인 창: 사용법, 업데이트, 문제 보고, 설정 복원 |
-| `window_view.py` | 메인 창: 보기 메뉴(화면 테마, 질량 단위, 저울 최소 눈금) |
-| `dialogs.py` | 모합금·사용자 원소·조성 시리즈·용탕 보정 창 |
-| `ui_common.py` | 버전, 스타일, 공통 함수 |
-| `composition.py` | 목표 조성 계산 |
-| `weighing.py` | 원료 칭량·용탕 보정 계산 (NNLS, 단체법) |
-| `formula.py` | 조성식·시리즈 해석 |
-| `elements_data.py` | 118개 원소 데이터 |
-| `storage.py` | 저장(.alloy), 엑셀/CSV 내보내기 |
-| `printing.py` | 칭량지 인쇄/PDF |
-| `mobile.py` | 휴대폰 칭량: QR 링크 만들기, 결과 해석 |
-| `updater.py` | 새 버전 확인, 설치 zip 내려받기, 자동 업데이트 (GitHub Releases) |
-| `autosave.py` | 자동 복구 파일, 저장 시 백업 |
-| `settings_backup.py` | 설정 백업(업데이트 직전 자동)과 복원 |
-| `logs.py` | 오류 기록 파일, 문제 보고용 zip |
+| `desktop\src\Program.cs` | 창, 화면과 주고받는 명령, 설정, **버전**(`AssemblyFileVersion`) |
+| `desktop\src\Files.cs` | 열기/저장 창, 파일 읽고 쓰기, 자동 복구·저장 백업 |
+| `desktop\src\Support.cs` | 업데이트 확인·내려받기·설치 도우미, 오류 기록·문제 보고, 설정 백업 |
+| `desktop\web\index.html`, `app.css`, `app.js` | 화면 전체 (주기율표, 조성·원료 표, 메뉴, 대화창) |
+| `desktop\web\engine.js` | 계산 (조성, 원료 칭량 NNLS·단체법, 용탕 보정, 조성식, 저장 형식) |
+| `desktop\web\export.js` | 엑셀·CSV·결과 복사, 휴대폰 링크·결과, 칭량지 |
+| `desktop\web\qr.js` | QR 코드 |
+| `desktop\web\elements.js` | 118개 원소 데이터 |
+| `desktop\lib\` | WebView2 SDK DLL (빌드 때 exe 옆으로 복사) |
+| `desktopuild.ps1` | 빌드 + 시험 전부 (계산·내보내기 대조, 화면 시험, 엑셀 대조) |
+| `desktop\package.ps1` | 위 빌드 후 설치 zip 만들기 |
+| `desktop\test\` | 시험. `golden*.json`은 파이썬판 결과(대조 기준) |
 | `web/` | 휴대폰 칭량 웹앱 (GitHub Pages에 올림. 바꾸면 `sw.js`의 VERSION도 올릴 것) |
-| `test_composition.py` | 테스트 (`.venv\Scripts\python test_composition.py`, `test_app.py`도 함께 돈다) |
-| `test_app.py` | 단위, 메인 창 흐름(저장·열기·단위·테마·업데이트 넘김), 휴대폰 웹앱(링크 오류, 오프라인) 테스트 |
 | `installer\` | 설치/제거 스크립트 원본 |
-| `build.bat` | 테스트 → exe → 설치 zip까지 한 번에 다시 만들기 |
+| `build.bat` | 시험 → 프로그램 → 설치 zip까지 한 번에 |
 | `publish.ps1` | 커밋·GitHub 올리기·릴리스를 한 번에 (아래 참고) |
-| `release_notes\v<버전>.md` | 그 버전의 변경 사항 (릴리스 설명 = 업데이트 알림 창 내용) |
+| `release_notes<버전>.md` | 그 버전의 변경 사항 (릴리스 설명 = 업데이트 알림 창 내용) |
+| `*.py` | v2.19까지의 파이썬판. 계산 결과 대조 기준으로만 남겨 둠 (`desktop\test\make_golden*.py`) |
+
+개발 중 실행: `desktop\out\ElementCalc.exe --dev` (오른쪽 클릭 → 검사로 개발자 도구).
 
 ### 새 버전 내기
 
-1. `ui_common.py`의 `VERSION`을 바꾸고 `release_notes\v<버전>.md`에 변경 사항을 씁니다(쉬운 말, `- ` 글머리표).
-2. `build.bat`으로 테스트·빌드 → `배포\elemcalc_v<버전>_setup.zip`.
+1. `desktop\src\Program.cs`의 `AssemblyVersion`·`AssemblyFileVersion`을 바꾸고 `release_notes<버전>.md`에
+   변경 사항을 씁니다(쉬운 말, `- ` 글머리표).
+2. `build.bat`으로 시험·빌드 → `배포\elemcalc_v<버전>_setup.zip`.
 3. `powershell -ExecutionPolicy Bypass -File publish.ps1` 하나로 다음을 합니다(GitHub CLI `gh` 로그인 필요).
    - 소스 커밋 → 비공개 저장소 `Dubitnarae/elemcalc-source`에 push (`CLAUDE.md`는 올리지 않음)
    - `web\` 파일을 공개 저장소 `Dubitnarae/elemcalc`(GitHub Pages, 휴대폰 웹앱)에 반영
-   - 그 저장소에 릴리스 `v<버전>` 생성: 설치 zip 첨부, 설명은 `release_notes\v<버전>.md`
+   - 그 저장소에 릴리스 `v<버전>` 생성: 설치 zip 첨부, 설명은 `release_notes<버전>.md`
 
 앱은 Releases의 최신 태그를 보고 알림을 띄우고 zip을 받아 자동 업데이트합니다. 파일 이름은 반드시
-`elemcalc_v<버전>_setup.zip` 규격이어야 앱이 찾습니다(`build.ps1`이 이 이름으로 만듭니다).
-자동 업데이트는 그 기능이 들어간 v2.15 이상에서 동작합니다.
+`elemcalc_v<버전>_setup.zip` 규격이어야 앱이 찾습니다(`package.ps1`이 이 이름으로 만듭니다).
+zip 구조가 2.x와 같아서 v2.15 이상의 파이썬판도 이 zip으로 자동 업데이트됩니다.

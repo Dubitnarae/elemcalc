@@ -12,6 +12,7 @@
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <style>
+@font-face { font-family: 'Pretendard'; font-weight: 45 920; font-style: normal; font-display: swap; src: url('fonts/PretendardVariable.woff2') format('woff2-variations'), url('fonts/PretendardVariable.woff2') format('woff2'); }
 :root {
   --bg: #f2f2f7; --card: #fff; --text: #1d1d1f; --sub: #86868b; --line: #e5e5ea;
   --accent: #0071e3; --ok: #248a3d; --ok-bg: #e9f7ed; --warn: #c93400; --warn-bg: #fff3dc;
@@ -20,8 +21,7 @@
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; background: var(--bg); color: var(--text); }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard",
-               "Noto Sans KR", "Malgun Gothic", sans-serif;
+  font-family: "Pretendard", "Noto Sans KR", "Malgun Gothic", sans-serif;
   font-size: 16px; line-height: 1.4; -webkit-font-smoothing: antialiased;
   padding: env(safe-area-inset-top) 0 calc(96px + env(safe-area-inset-bottom));
 }
